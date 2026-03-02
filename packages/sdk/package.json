@@ -1,0 +1,30 @@
+{
+    "name": "@rootstock-kits/refuel-sdk",
+    "version": "1.0.0",
+    "description": "SDK for gasless token-to-RBTC swaps on Rootstock",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+        "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+        "lint": "tsc --noEmit",
+        "test": "vitest run",
+        "clean": "rm -rf dist"
+    },
+    "dependencies": {
+        "viem": "^2.20.0"
+    },
+    "devDependencies": {
+        "tsup": "^8.0.0",
+        "typescript": "^5.4.0",
+        "vitest": "^1.6.0"
+    },
+    "peerDependencies": {
+        "viem": "^2.0.0"
+    },
+    "files": [
+        "dist"
+    ],
+    "license": "MIT"
+}

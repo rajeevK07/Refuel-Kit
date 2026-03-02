@@ -10,17 +10,17 @@
 
 <br />
 
-## 🚨 The Problem: The Crypto "Death Spiral"
+## The Problem: The Crypto "Death Spiral"
 A user bridges their assets (USDC, RIF) to Rootstock, but they forget to bridge RBTC for gas. They are now **stuck**. They have funds, but they cannot execute a single transaction to swap them for gas. They are forced to go back to a centralized exchange, buy RBTC, and send it to their wallet just to make their first move. This is the #1 friction point in onboarding users to a new L2/sidechain.
 
-## 💡 The Solution: Refuel Station
+## The Solution: Refuel Station
 The `Refuel-Kit` is the "Emergency Jerry Can" for the Rootstock ecosystem. 
 
 It allows a stranded user to swap a fixed amount of supported tokens (e.g., 5 USDC or 5 RIF) for enough RBTC (0.001) to act as gas for their future transactions. And because they don't have gas to initiate the swap, **the swap itself is completely gasless**, utilizing EIP-2612 Permits and a Relayer network.
 
 ---
 
-## 🚀 Live Deployment (Rootstock Testnet)
+## Live Deployment (Rootstock Testnet)
 
 The RefuelSwap smart contract is live and fully verified on the Rootstock Testnet:
 
@@ -29,7 +29,7 @@ The RefuelSwap smart contract is live and fully verified on the Rootstock Testne
 
 ---
 
-## 🏗️ Architecture & How It Works
+## Architecture & How It Works
 
 ```mermaid
 sequenceDiagram
@@ -50,7 +50,7 @@ sequenceDiagram
 
 ---
 
-## 📦 Monorepo Packages
+## Monorepo Packages
 
 This project is a modern Turborepo containing everything needed to deploy and integrate the gasless rescue flow.
 
@@ -82,7 +82,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the Rescue Station.
 
 ---
 
-## 🧩 Embedding the Widget in Your dApp
+## Embedding the Widget in Your dApp
 
 The `RefuelWidget` is designed to be completely plug-and-play. You can drop it anywhere in your dApp, and it will remain hidden until it detects that the user is low on gas (<0.0001 RBTC).
 
@@ -115,7 +115,7 @@ export function App() {
 
 ---
 
-## � Modifying Smart Contracts
+## Modifying Smart Contracts
 
 Contracts are built using Foundry. To run tests or deploy your own relayer endpoints:
 
@@ -131,7 +131,7 @@ forge script script/Deploy.s.sol:DeployRefuelSwap --rpc-url rootstock_testnet --
 
 ---
 
-## 📋 Tech Stack
+## Tech Stack
 
 * **Contracts:** Solidity (v0.8.20), Foundry, OpenZeppelin (v5.6.1)
 * **SDK:** TypeScript, Viem, EIP-2612, EIP-712 Typed Data

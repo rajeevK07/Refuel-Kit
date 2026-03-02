@@ -1,0 +1,20 @@
+{
+  "name": "rootstock-refuel-kit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The '0 Gas' Rescue Widget for Rootstock — swap ERC20 tokens for RBTC without gas",
+  "author": "Rootstock Kits",
+  "license": "MIT",
+  "packageManager": "pnpm@9.1.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}

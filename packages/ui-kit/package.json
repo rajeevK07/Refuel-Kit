@@ -1,0 +1,32 @@
+{
+    "name": "@rootstock-kits/refuel-ui",
+    "version": "1.0.0",
+    "description": "Drop-in React widget for gasless RBTC refueling on Rootstock",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format cjs,esm --dts --clean --external react",
+        "dev": "tsup src/index.ts --format cjs,esm --dts --watch --external react",
+        "lint": "tsc --noEmit",
+        "clean": "rm -rf dist"
+    },
+    "dependencies": {
+        "@rootstock-kits/refuel-sdk": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.0",
+        "react": "^18.2.0",
+        "tsup": "^8.0.0",
+        "typescript": "^5.4.0"
+    },
+    "peerDependencies": {
+        "react": "^18.0.0",
+        "viem": "^2.0.0"
+    },
+    "files": [
+        "dist",
+        "src/styles"
+    ],
+    "license": "MIT"
+}
