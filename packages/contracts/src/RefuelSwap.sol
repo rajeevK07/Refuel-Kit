@@ -39,6 +39,7 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         uint256 tokenAmount; // e.g. 5 * 1e18  (5 tokens)
         uint256 rbtcAmount; // e.g. 1e15       (0.001 RBTC)
         bool enabled;
+        uint256 validFrom; // timestamp after which this rate is effective (M2 timelock)
     }
 
     /// @notice token address → swap rate configuration
@@ -46,6 +47,20 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
 
     /// @notice List of supported token addresses (for enumeration)
     address[] public supportedTokens;
+
+    /// @notice Whitelist of approved relayers (C1)
+    mapping(address => bool) public isRelayer;
+
+    /// @notice Failed RBTC transfers stored for manual withdrawal (H2)
+    mapping(address => uint256) public pendingRbtcWithdrawals;
+
+    /// @notice Tracks user's last refuel timestamp for rate limiting (L4)
+    mapping(address => uint256) public lastRefuelTime;
+
+    modifier onlyRelayer() {
+        if (!isRelayer[msg.sender]) revert Unauthorized();
+        _;
+    }
 
     // ──────────────────────────────────────────────
     //  Constructor
@@ -57,7 +72,7 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
     //  Receive RBTC (liquidity deposits)
     // ──────────────────────────────────────────────
 
-    receive() external payable {
+    receive() external payable onlyOwner {
         emit LiquidityDeposited(msg.sender, msg.value);
     }
 
@@ -106,7 +121,7 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external nonReentrant {
+    ) external nonReentrant onlyRelayer {
         if (owner == address(0)) revert ZeroAddress();
         _refuelPermitInternal(owner, token, amount, deadline, v, r, s);
     }
@@ -120,8 +135,14 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         bytes32 r,
         bytes32 s
     ) internal {
+        // Enforce rate limit (L4)
+        if (lastRefuelTime[owner] != 0 && block.timestamp < lastRefuelTime[owner] + 1 hours) {
+            revert RateLimitExceeded();
+        }
+        lastRefuelTime[owner] = block.timestamp;
+
         // 1. Validate
-        SwapRate memory rate = _validateSwap(token, amount);
+        (, uint256 rbtcOut) = _validateSwap(token, amount);
 
         // 2. Execute permit (set allowance from user → this contract)
         IERC20Permit(token).permit(
@@ -135,7 +156,7 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         );
 
         // 3. Execute swap
-        _executeSwap(owner, token, amount, rate);
+        _executeSwap(owner, token, amount, rbtcOut);
     }
 
     // ──────────────────────────────────────────────
@@ -147,11 +168,17 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         address token,
         uint256 amount
     ) external override nonReentrant {
+        // Enforce rate limit (L4)
+        if (lastRefuelTime[msg.sender] != 0 && block.timestamp < lastRefuelTime[msg.sender] + 1 hours) {
+            revert RateLimitExceeded();
+        }
+        lastRefuelTime[msg.sender] = block.timestamp;
+
         // 1. Validate
-        SwapRate memory rate = _validateSwap(token, amount);
+        (, uint256 rbtcOut) = _validateSwap(token, amount);
 
         // 2. Execute swap (allowance must already be set)
-        _executeSwap(msg.sender, token, amount, rate);
+        _executeSwap(msg.sender, token, amount, rbtcOut);
     }
 
     /**
@@ -161,10 +188,17 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         address owner,
         address token,
         uint256 amount
-    ) external nonReentrant {
+    ) external nonReentrant onlyRelayer {
         if (owner == address(0)) revert ZeroAddress();
-        SwapRate memory rate = _validateSwap(token, amount);
-        _executeSwap(owner, token, amount, rate);
+        
+        // Enforce rate limit (L4)
+        if (lastRefuelTime[owner] != 0 && block.timestamp < lastRefuelTime[owner] + 1 hours) {
+            revert RateLimitExceeded();
+        }
+        lastRefuelTime[owner] = block.timestamp;
+
+        (, uint256 rbtcOut) = _validateSwap(token, amount);
+        _executeSwap(owner, token, amount, rbtcOut);
     }
 
     // ──────────────────────────────────────────────
@@ -221,10 +255,18 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
 
         bool isNew = !swapRates[token].enabled;
 
+        // M2: Front‑running protection — timelocked rate changes.
+        // New tokens become active immediately. For existing tokens, any
+        // rate change only becomes effective after a delay window, so users
+        // who quoted under the previous rate are not silently filled at a
+        // worse price.
+        uint256 validFrom = isNew ? block.timestamp : block.timestamp + 1 hours;
+
         swapRates[token] = SwapRate({
             tokenAmount: tokenAmount,
             rbtcAmount: rbtcAmount,
-            enabled: true
+            enabled: true,
+            validFrom: validFrom
         });
 
         if (isNew) {
@@ -239,6 +281,16 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
      */
     function disableToken(address token) external onlyOwner {
         swapRates[token].enabled = false;
+        
+        // Remove from supportedTokens array (M3)
+        uint256 length = supportedTokens.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (supportedTokens[i] == token) {
+                supportedTokens[i] = supportedTokens[length - 1];
+                supportedTokens.pop();
+                break;
+            }
+        }
     }
 
     /**
@@ -271,6 +323,32 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         emit RbtcWithdrawn(amount);
     }
 
+    /**
+     * @notice Set Relayer address.
+     */
+    function setRelayer(address relayer, bool status) external onlyOwner {
+        isRelayer[relayer] = status;
+        emit RelayerConfigured(relayer, status);
+    }
+
+    /**
+     * @notice Withdraw pending RBTC for failed transfers (H2)
+     */
+    function withdrawPendingRbtc() external nonReentrant {
+        uint256 amount = pendingRbtcWithdrawals[msg.sender];
+        if (amount == 0) revert InvalidAmount();
+
+        pendingRbtcWithdrawals[msg.sender] = 0;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        if (!success) {
+            pendingRbtcWithdrawals[msg.sender] = amount;
+            revert TransferFailed();
+        }
+
+        emit PendingRbtcWithdrawn(msg.sender, amount);
+    }
+
     // ──────────────────────────────────────────────
     //  Internal Helpers
     // ──────────────────────────────────────────────
@@ -278,14 +356,16 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
     function _validateSwap(
         address token,
         uint256 amount
-    ) internal view returns (SwapRate memory rate) {
+    ) internal view returns (SwapRate memory rate, uint256 rbtcOut) {
         rate = swapRates[token];
 
-        if (!rate.enabled) revert TokenNotSupported(token);
+        if (!rate.enabled || block.timestamp < rate.validFrom) {
+            revert TokenNotSupported(token);
+        }
         if (amount == 0) revert InvalidAmount();
 
-        // Calculate RBTC to send
-        uint256 rbtcOut = (amount * rate.rbtcAmount) / rate.tokenAmount;
+        // Calculate RBTC to send (L2)
+        rbtcOut = (amount * rate.rbtcAmount) / rate.tokenAmount;
         if (rbtcOut > address(this).balance) {
             revert InsufficientRbtcLiquidity(rbtcOut, address(this).balance);
         }
@@ -295,16 +375,16 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         address owner,
         address token,
         uint256 amount,
-        SwapRate memory rate
+        uint256 rbtcOut
     ) internal {
         // 1. Pull tokens from the user
         IERC20(token).safeTransferFrom(owner, address(this), amount);
 
-        // 2. Calculate and send RBTC
-        uint256 rbtcOut = (amount * rate.rbtcAmount) / rate.tokenAmount;
-
+        // 2. Send RBTC. Save to pending on failure to prevent DoS (H2)
         (bool success, ) = owner.call{value: rbtcOut}("");
-        if (!success) revert TransferFailed();
+        if (!success) {
+            pendingRbtcWithdrawals[owner] += rbtcOut;
+        }
 
         emit Refueled(owner, token, amount, rbtcOut);
     }

@@ -2,7 +2,7 @@
 // useRefuel — State machine hook for the refuel flow
 // ─────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import type { WalletClient, Address } from "viem";
 import {
     RefuelClient,
@@ -31,17 +31,20 @@ export function useRefuel(options: UseRefuelOptions): UseRefuelReturn {
     const { config } = options;
     const [state, setState] = useState<RefuelState>({ step: "idle" });
     const [result, setResult] = useState<RefuelResult | null>(null);
-    const clientRef = useRef<RefuelClient>(new RefuelClient(config));
+    const client = React.useMemo(
+        () => new RefuelClient(config),
+        [config.chainId, config.contractAddress, config.relayerUrl, config.rpcUrl]
+    );
 
     const refuel = useCallback(
         async (token: TokenSymbol, walletClient: WalletClient) => {
             try {
                 setState({ step: "checking-balance" });
 
-                const refuelResult = await clientRef.current.refuel(
+                const refuelResult = await client.refuel(
                     { token },
                     walletClient,
-                    (stateStr) => {
+                    (stateStr, data) => {
                         switch (stateStr) {
                             case "checking-balance":
                                 setState({ step: "checking-balance" });
@@ -55,7 +58,7 @@ export function useRefuel(options: UseRefuelOptions): UseRefuelReturn {
                             case "confirming":
                                 setState({
                                     step: "confirming",
-                                    txHash: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+                                    txHash: data?.txHash ?? ("0x" as `0x${string}`),
                                 });
                                 break;
                             case "success":
@@ -76,7 +79,7 @@ export function useRefuel(options: UseRefuelOptions): UseRefuelReturn {
                 });
             }
         },
-        [config]
+        [client]
     );
 
     const reset = useCallback(() => {

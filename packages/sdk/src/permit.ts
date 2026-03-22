@@ -3,9 +3,11 @@
 // ─────────────────────────────────────────────────────
 
 import {
+    parseSignature,
     type Address,
     type WalletClient,
     type PublicClient,
+    type Hex,
 } from "viem";
 import type { PermitData, SignedPermit } from "./types";
 import { ERC20_ABI } from "./constants";
@@ -28,7 +30,10 @@ export async function signPermit(
     tokenAddress: Address,
     spender: Address,
     value: bigint,
-    deadline?: bigint
+    options?: {
+        deadline?: bigint;
+        version?: string;
+    }
 ): Promise<SignedPermit> {
     const account = walletClient.account;
     if (!account) throw new Error("Wallet client must have an account");
@@ -37,7 +42,7 @@ export async function signPermit(
 
     // Default deadline: 1 hour from now
     const permitDeadline =
-        deadline ?? BigInt(Math.floor(Date.now() / 1000) + 3600);
+        options?.deadline ?? BigInt(Math.floor(Date.now() / 1000) + 3600);
 
     // Get token nonce
     const nonce = await getPermitNonce(publicClient, tokenAddress, owner);
@@ -55,7 +60,7 @@ export async function signPermit(
     // Build EIP-712 typed data
     const domain = {
         name: tokenName as string,
-        version: "1",
+        version: options?.version ?? "1",
         chainId: BigInt(chainId),
         verifyingContract: tokenAddress,
     } as const;
@@ -87,10 +92,12 @@ export async function signPermit(
         message,
     });
 
-    // Parse v, r, s from the signature
-    const r = `0x${signature.slice(2, 66)}` as `0x${string}`;
-    const s = `0x${signature.slice(66, 130)}` as `0x${string}`;
-    const v = parseInt(signature.slice(130, 132), 16);
+    // Parse v, r, s from the signature robustly (L3)
+    const { r, s, v } = parseSignature(signature);
+
+    if (!r || !s || v === undefined) {
+        throw new Error("Failed to parse signature");
+    }
 
     return {
         owner,
@@ -98,7 +105,7 @@ export async function signPermit(
         value,
         nonce,
         deadline: permitDeadline,
-        v,
+        v: Number(v),
         r,
         s,
     };

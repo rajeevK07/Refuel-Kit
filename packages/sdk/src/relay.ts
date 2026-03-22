@@ -21,9 +21,22 @@ interface RelayResponse {
  * 3. Pay the gas in RBTC
  * 4. Return the transaction hash
  */
+/** Thrown when the relay server requires token approval before proceeding */
+export class NeedsApprovalError extends Error {
+    public readonly spenderAddress: string;
+    public readonly requiredAmount: string;
+    constructor(spenderAddress: string, requiredAmount: string) {
+        super(`Token approval required. Approve ${requiredAmount} tokens to spender ${spenderAddress}`);
+        this.name = "NeedsApprovalError";
+        this.spenderAddress = spenderAddress;
+        this.requiredAmount = requiredAmount;
+    }
+}
+
 export async function submitToRelay(
     relayerUrl: string,
-    request: RefuelRequest
+    request: RefuelRequest,
+    chainId: number
 ): Promise<Hash> {
     const payload = {
         owner: request.owner,
@@ -38,6 +51,8 @@ export async function submitToRelay(
                 s: request.permit.s,
             }
             : undefined,
+        signature: request.signature,
+        chainId,
     };
 
     const response = await fetch(`${relayerUrl}/api/refuel`, {
@@ -47,8 +62,20 @@ export async function submitToRelay(
     });
 
     if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Relay server error (${response.status}): ${errorBody}`);
+        // Try to parse structured error from relay backend
+        try {
+            const errorData = await response.json();
+            if (errorData.needsApproval) {
+                throw new NeedsApprovalError(
+                    errorData.spenderAddress,
+                    errorData.requiredAmount
+                );
+            }
+            throw new Error(errorData.error || `Relay server error (${response.status})`);
+        } catch (e) {
+            if (e instanceof NeedsApprovalError) throw e;
+            throw new Error(`Relay server error (${response.status})`);
+        }
     }
 
     const data: RelayResponse = await response.json();
@@ -82,46 +109,3 @@ export async function checkRelayStatus(
     };
 }
 
-// ─────────────────────────────────────────────────────
-// Mock Relayer — for development and demo purposes
-// ─────────────────────────────────────────────────────
-
-/**
- * A mock relay server that simulates the relay flow.
- * Used in the demo app when no real relay infrastructure is available.
- *
- * Simulates:
- * - 1s delay for "relaying"
- * - 2s delay for "confirming"
- * - Returns a fake but valid-looking tx hash
- */
-export class MockRelayer {
-    private delay: number;
-
-    constructor(delayMs: number = 2000) {
-        this.delay = delayMs;
-    }
-
-    async submitRefuel(request: RefuelRequest): Promise<RefuelResult> {
-        // Simulate relay delay
-        await this._sleep(this.delay);
-
-        // Generate a deterministic-looking tx hash (valid 32-byte hex)
-        const mockHash = `0x${"ab".repeat(32)}` as Hash;
-
-        // Simulate confirmation delay
-        await this._sleep(this.delay / 2);
-
-        return {
-            txHash: mockHash,
-            rbtcReceived: 1_000_000_000_000_000n, // 0.001 RBTC
-            tokenSpent: request.amount,
-            blockNumber: BigInt(Math.floor(Math.random() * 10_000_000)),
-            status: "success",
-        };
-    }
-
-    private _sleep(ms: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-}

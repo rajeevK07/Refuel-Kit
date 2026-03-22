@@ -60,6 +60,9 @@ contract RefuelSwapTest is Test {
         refuel.configureToken(address(permitToken), TOKEN_AMOUNT, RBTC_AMOUNT);
         refuel.configureToken(address(basicToken), TOKEN_AMOUNT, RBTC_AMOUNT);
 
+        // Configure relayer
+        refuel.setRelayer(relayer, true);
+
         // Deposit RBTC liquidity
         refuel.depositLiquidity{value: INITIAL_LIQUIDITY}();
         vm.stopPrank();
@@ -225,12 +228,12 @@ contract RefuelSwapTest is Test {
 
     // ─── View Function Tests ─────────────────────────
 
-    function test_GetQuote() public {
+    function test_GetQuote() public view {
         uint256 quote = refuel.getQuote(address(permitToken), TOKEN_AMOUNT);
         assertEq(quote, RBTC_AMOUNT, "Quote should match configured rate");
     }
 
-    function test_GetQuote_HalfAmount() public {
+    function test_GetQuote_HalfAmount() public view {
         uint256 halfAmount = TOKEN_AMOUNT / 2;
         uint256 quote = refuel.getQuote(address(permitToken), halfAmount);
         assertEq(quote, RBTC_AMOUNT / 2, "Half amount should give half RBTC");
@@ -241,7 +244,7 @@ contract RefuelSwapTest is Test {
         assertFalse(refuel.isTokenSupported(makeAddr("random")));
     }
 
-    function test_AvailableLiquidity() public {
+    function test_AvailableLiquidity() public view {
         assertEq(refuel.availableLiquidity(), INITIAL_LIQUIDITY);
     }
 
@@ -334,5 +337,57 @@ contract RefuelSwapTest is Test {
         );
 
         (v, r, s) = vm.sign(_ownerKey, digest);
+    }
+
+    // ─── L7: Fuzz and Edge Case Tests ─────────────
+
+    function testFuzz_RefuelWithAllowance(uint256 amount) public {
+        // reasonable bounds
+        vm.assume(amount > 0 && amount < 100_000 ether);
+        
+        // Ensure contract has liquidity to pay
+        uint256 expectedRbtcOut = (amount * RBTC_AMOUNT) / TOKEN_AMOUNT;
+        vm.assume(expectedRbtcOut <= INITIAL_LIQUIDITY);
+
+        basicToken.mint(user, amount);
+
+        vm.startPrank(user);
+        basicToken.approve(address(refuel), amount);
+        
+        uint256 userRbtcBefore = user.balance;
+        refuel.refuelWithAllowance(address(basicToken), amount);
+        vm.stopPrank();
+
+        assertEq(user.balance - userRbtcBefore, expectedRbtcOut, "User should receive RBTC");
+    }
+
+    function test_SequentialSwapsRateLimit() public {
+        vm.startPrank(user);
+        basicToken.approve(address(refuel), TOKEN_AMOUNT * 2);
+        
+        // First swap succeeds
+        refuel.refuelWithAllowance(address(basicToken), TOKEN_AMOUNT);
+        
+        // Second swap reverts immediately due to rate limit (L4)
+        vm.expectRevert(IRefuelSwap.RateLimitExceeded.selector);
+        refuel.refuelWithAllowance(address(basicToken), TOKEN_AMOUNT);
+        
+        // Advance time by 1 hour + 1 second
+        skip(3601);
+        
+        // Third swap succeeds after cooldown
+        refuel.refuelWithAllowance(address(basicToken), TOKEN_AMOUNT);
+        vm.stopPrank();
+    }
+
+    function test_ReceiveOnlyOwner() public {
+        vm.deal(makeAddr("randomDude"), 1 ether);
+        vm.startPrank(makeAddr("randomDude"));
+        
+        // Use low level call since receive is payable
+        (bool success, ) = address(refuel).call{value: 1 ether}("");
+        assertFalse(success, "Random user should not be able to deposit via receive");
+        
+        vm.stopPrank();
     }
 }

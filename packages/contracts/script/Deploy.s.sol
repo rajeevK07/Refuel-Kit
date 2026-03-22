@@ -23,8 +23,9 @@ contract DeployRefuelSwap is Script {
     address constant USDC = 0xbB739A6e04d07b08E38B66ba137d0c9Cd270c750;
 
     // Swap rates
-    uint256 constant TOKEN_AMOUNT = 5 ether; // 5 tokens (18 decimals)
-    uint256 constant RBTC_AMOUNT = 0.00001 ether; // 0.00001 RBTC
+    uint256 constant TOKEN_AMOUNT = 50 ether;       // 50 RIF  (18 decimals) → 0.0001 RBTC
+    uint256 constant USDC_TOKEN_AMOUNT = 5_000_000;  // 5 USDC  (6 decimals)  → 0.00001 RBTC
+    uint256 constant RBTC_AMOUNT = 0.00001 ether;    // 0.00001 RBTC per 5-base units
 
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
@@ -41,14 +42,21 @@ contract DeployRefuelSwap is Script {
 
         // 2. Configure tokens based on chain
         if (block.chainid == 31) {
-            // Testnet
+            // Testnet — tRIF (18 decimals)
             refuel.configureToken(TRIF, TOKEN_AMOUNT, RBTC_AMOUNT);
             console.log("Configured tRIF:", TRIF);
+
+            // Testnet — tUSDC (18 decimals on testnet mock)
+            // Note: testnet mock USDC uses 18 decimals unlike mainnet USDC (6 decimals)
+            refuel.configureToken(TUSDC, TOKEN_AMOUNT, RBTC_AMOUNT);
+            console.log("Configured tUSDC:", TUSDC);
         } else if (block.chainid == 30) {
-            // Mainnet
+            // Mainnet — RIF (18 decimals)
             refuel.configureToken(RIF, TOKEN_AMOUNT, RBTC_AMOUNT);
-            refuel.configureToken(USDC, TOKEN_AMOUNT, RBTC_AMOUNT);
             console.log("Configured RIF:", RIF);
+
+            // Mainnet — USDC (6 decimals)
+            refuel.configureToken(USDC, USDC_TOKEN_AMOUNT, RBTC_AMOUNT);
             console.log("Configured USDC:", USDC);
         }
 

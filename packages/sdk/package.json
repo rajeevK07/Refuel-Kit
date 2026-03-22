@@ -6,22 +6,23 @@
     "module": "dist/index.mjs",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-        "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+        "build": "tsup src/index.ts --format cjs,esm --dts --clean --external web3",
+        "dev": "tsup src/index.ts --format cjs,esm --dts --watch --external web3",
         "lint": "tsc --noEmit",
         "test": "vitest run",
+        "example:refuel": "tsx examples/testnet-refuel.ts",
         "clean": "rm -rf dist"
     },
     "dependencies": {
-        "viem": "^2.20.0"
+        "@rsksmart/rif-relay-sdk": "^1.0.0-alpha.4",
+        "viem": "^2.47.4"
     },
     "devDependencies": {
+        "@types/node": "^25.5.0",
         "tsup": "^8.0.0",
+        "tsx": "^4.21.0",
         "typescript": "^5.4.0",
         "vitest": "^1.6.0"
-    },
-    "peerDependencies": {
-        "viem": "^2.0.0"
     },
     "files": [
         "dist"

@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────
 
 import type { Address } from "viem";
-import type { ChainConfig, TokenConfig } from "./types";
+import type { ChainConfig, TokenConfig, RootstockChainId } from "./types";
 
 // ─── RBTC Threshold ──────────────────────────────────
 
@@ -13,8 +13,11 @@ export const REFUEL_THRESHOLD = 100_000_000_000_000n; // 0.0001 ether in wei
 /** Default RBTC amount returned per refuel (0.001 RBTC) */
 export const RBTC_PER_REFUEL = 1_000_000_000_000_000n; // 0.001 ether in wei
 
-/** Default token amount required per refuel (5 tokens, 18 decimals) */
+/** Default token amount required per refuel (5 tokens, 18 decimals)
+ *  Based on contract rate: 5 tokens = 0.001 RBTC
+ */
 export const DEFAULT_TOKEN_AMOUNT = 5_000_000_000_000_000_000n; // 5e18
+
 
 // ─── Token Configs ───────────────────────────────────
 
@@ -32,6 +35,7 @@ const USDC_MAINNET: TokenConfig = {
     decimals: 6, // Circle USDC uses 6 decimals
     permitSupport: "eip2612", // USDC supports EIP-2612
     refuelAmount: 5_000_000n, // 5 USDC (6 decimals)
+    domainVersion: "2",
 };
 
 const RIF_TESTNET: TokenConfig = {
@@ -39,26 +43,27 @@ const RIF_TESTNET: TokenConfig = {
     address: "0x19f64674d8a5b4e652319f5e239efd3bc969a1fe" as Address,
     decimals: 18,
     permitSupport: "legacy-approve",
-    refuelAmount: DEFAULT_TOKEN_AMOUNT,
+    refuelAmount: 5_000_000_000_000_000_000n, // 5 RIF → 0.001 RBTC at deployed rate
 };
 
 const USDC_TESTNET: TokenConfig = {
     symbol: "USDC",
-    address: "0x166844b69f20dd7c609b81cca603fe81f19c54b9" as Address,
-    decimals: 6, // Circle USDC uses 6 decimals
-    permitSupport: "eip2612",
-    refuelAmount: 5_000_000n, // 5 USDC (6 decimals)
+    address: "0x6491A87c4a710c0cE79E60aEC0B1C3e847F4C852" as Address,
+    decimals: 18, // Rootstock Testnet mock USDC uses 18 decimals
+    permitSupport: "eip2612", // Now points to our custom MockPermitToken
+    domainVersion: "1",
+    refuelAmount: 5_000_000_000_000_000_000n, // 5 USDC equiv → 0.001 RBTC at deployed rate
 };
 
 // ─── Chain Configs ───────────────────────────────────
 
-export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
+export const CHAIN_CONFIGS: Record<RootstockChainId, ChainConfig> = {
     30: {
         chainId: 30,
         name: "Rootstock Mainnet",
         rpcUrl: "https://public-node.rsk.co",
         blockExplorerUrl: "https://rootstock.blockscout.com",
-        refuelSwapAddress: "0x0000000000000000000000000000000000000000" as Address, // To be set after deployment
+        refuelSwapAddress: "0x1111111111111111111111111111111111111111" as Address, // Placeholder until mainnet deployment
         tokens: {
             RIF: RIF_MAINNET,
             USDC: USDC_MAINNET,
@@ -78,6 +83,29 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
         rbtcPerRefuel: RBTC_PER_REFUEL,
     },
 };
+
+// ─── RIF Relay Contract Addresses ────────────────────
+// Official RIF Relay V1 contracts deployed on Rootstock.
+// Source: https://dev.rootstock.io/developers/integrate/rif-relay/contracts/
+//
+// To deploy your own: see docs/RIF_RELAY_SETUP.md
+// To use an existing deployment: pass these addresses to RefuelConfig.rifRelay
+
+export const RIF_RELAY_TESTNET_ADDRESSES = {
+    relayHubAddress: "0xAd525463961399793f8716b0D85133ff7503a7C2" as Address,
+    relayVerifierAddress: "0xB86c972Ff212838C4c396199B27a0DBe45560df8" as Address,
+    deployVerifierAddress: "0xc67f193Bb1D64F13FD49E2da6586a2F417e56b16" as Address,
+    /** SmartWalletFactory must be set by the operator after deployment */
+    smartWalletFactoryAddress: undefined as Address | undefined,
+} as const;
+
+export const RIF_RELAY_MAINNET_ADDRESSES = {
+    /** Operators must deploy their own RIF Relay infrastructure on mainnet */
+    relayHubAddress: undefined as Address | undefined,
+    relayVerifierAddress: undefined as Address | undefined,
+    deployVerifierAddress: undefined as Address | undefined,
+    smartWalletFactoryAddress: undefined as Address | undefined,
+} as const;
 
 // ─── ABI (RefuelSwap) ────────────────────────────────
 

@@ -31,7 +31,9 @@ import {
 } from "./constants";
 
 import { signPermit } from "./permit";
-import { submitToRelay, MockRelayer } from "./relay";
+import { submitToRelay } from "./relay";
+import { signRelayRequest } from "./relay-auth";
+import { submitToRifRelay } from "./rif-relay";
 
 /**
  * RefuelClient — The main interface for the Rootstock Refuel SDK.
@@ -57,8 +59,7 @@ export class RefuelClient {
     private chainConfig: ChainConfig;
     private relayerUrl: string;
     private contractAddress: Address;
-    private useMockRelay: boolean;
-    private mockRelayer?: MockRelayer;
+    private rifRelayConfig?: RefuelConfig["rifRelay"];
 
     constructor(config: RefuelConfig) {
         const chainConfig = CHAIN_CONFIGS[config.chainId];
@@ -71,15 +72,23 @@ export class RefuelClient {
         this.chainConfig = chainConfig;
         this.contractAddress =
             config.contractAddress ?? chainConfig.refuelSwapAddress;
+        
+        if (this.contractAddress === "0x0000000000000000000000000000000000000000") {
+            throw new Error(`RefuelSwap contract is not yet deployed on chain ${config.chainId}. Provide a valid custom contractAddress.`);
+        }
         this.relayerUrl = config.relayerUrl ?? "";
-        this.useMockRelay = !config.relayerUrl;
+        this.rifRelayConfig = config.rifRelay;
 
-        if (this.useMockRelay) {
-            this.mockRelayer = new MockRelayer();
+        if (!this.rifRelayConfig && !this.relayerUrl) {
+            throw new Error(
+                "No relay configured. Provide rifRelay config (recommended) or a relayerUrl. " +
+                "See docs/RIF_RELAY_SETUP.md for deployment instructions."
+            );
         }
 
         this.publicClient = createPublicClient({
             transport: http(config.rpcUrl ?? chainConfig.rpcUrl),
+            batch: { multicall: true },
         });
     }
 
@@ -114,10 +123,6 @@ export class RefuelClient {
                     };
                 } catch (err) {
                     // Token contract may not exist on this network or may be invalid
-                    console.warn(
-                        `[RefuelSDK] Failed to fetch ${token.symbol} balance at ${token.address}:`,
-                        err instanceof Error ? err.message : err
-                    );
                     return {
                         token,
                         balance: 0n,
@@ -171,7 +176,7 @@ export class RefuelClient {
     async refuel(
         params: RefuelParams,
         walletClient: WalletClient,
-        onStateChange?: (state: string) => void
+        onStateChange?: (state: string, data?: any) => void
     ): Promise<RefuelResult> {
         const account = walletClient.account;
         if (!account) throw new Error("Wallet client must have an account");
@@ -195,26 +200,54 @@ export class RefuelClient {
                 tokenConfig.address,
                 this.contractAddress,
                 request.amount,
-                params.deadline
+                {
+                    deadline: params.deadline,
+                    version: tokenConfig.domainVersion,
+                }
             );
 
             request.permit = signedPermit;
         }
 
-        // 3. Submit to relay
+        // 3. Sign the relay request itself (M1)
+        onStateChange?.("awaiting-signature");
+        request.signature = await signRelayRequest(
+            walletClient,
+            request,
+            this.chainConfig.chainId
+        );
+
+        // 4. Submit to relay
         onStateChange?.("relaying");
 
-        if (this.useMockRelay && this.mockRelayer) {
-            // Use mock relayer for demo
-            const result = await this.mockRelayer.submitRefuel(request);
-            onStateChange?.("success");
+        // Preferred: RIF Relay (if configured)
+        if (this.rifRelayConfig) {
+            const txHash = await submitToRifRelay(
+                this.rifRelayConfig,
+                this.chainConfig.chainId,
+                this.contractAddress,
+                request
+            );
+            onStateChange?.("confirming", { txHash });
+            const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+            const result: RefuelResult = {
+                txHash,
+                rbtcReceived: this.chainConfig.rbtcPerRefuel,
+                tokenSpent: request.amount,
+                blockNumber: receipt.blockNumber,
+                status: receipt.status === "success" ? "success" : "reverted",
+            };
+            onStateChange?.(result.status);
             return result;
         }
 
-        // Real relay
-        const txHash = await submitToRelay(this.relayerUrl, request);
-
-        onStateChange?.("confirming");
+        // Custom HTTP relay fallback
+        const txHash = await submitToRelay(
+            this.relayerUrl,
+            request,
+            this.chainConfig.chainId
+        );
+        onStateChange?.("confirming", { txHash });
 
         // 4. Wait for confirmation
         const receipt = await this.publicClient.waitForTransactionReceipt({

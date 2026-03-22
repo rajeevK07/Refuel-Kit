@@ -17,10 +17,19 @@ export const TokenSelector: React.FC<TokenSelectorProps> = ({
     onSelect,
 }) => {
     const formatBalance = (balance: bigint, decimals: number): string => {
-        const value = Number(balance) / Math.pow(10, decimals);
-        if (value === 0) return "0";
-        if (value < 0.01) return "<0.01";
-        return value.toFixed(2);
+        if (balance === 0n) return "0";
+        // H4: Use bigint arithmetic to avoid Number precision loss for large balances
+        const divisor = BigInt(10 ** decimals);
+        const whole = balance / divisor;
+        const remainder = balance % divisor;
+        if (whole === 0n && remainder === 0n) return "0";
+        // Format fractional part with leading zeros
+        const fracStr = remainder.toString().padStart(decimals, "0").replace(/0+$/, "");
+        if (fracStr.length === 0) return whole.toLocaleString();
+        const trimmedFrac = fracStr.slice(0, 6); // max 6 decimal places
+        const result = parseFloat(`${whole}.${trimmedFrac}`);
+        if (result < 0.0001) return "<0.0001";
+        return result.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 });
     };
 
     return (

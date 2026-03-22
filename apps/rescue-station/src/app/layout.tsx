@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+// Important: Import the UI kit styles because tsup does not auto-inject them
+import "@rootstock-kits/refuel-ui/src/styles/refuel.css";
 
 export const metadata: Metadata = {
     title: "Rescue Station — Rootstock Refuel Kit",

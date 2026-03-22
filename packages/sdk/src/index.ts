@@ -9,7 +9,8 @@ export { RefuelClient } from "./RefuelClient";
 export { signPermit, getPermitNonce, supportsPermit } from "./permit";
 
 // Relay utilities
-export { submitToRelay, checkRelayStatus, MockRelayer } from "./relay";
+export { submitToRelay, checkRelayStatus } from "./relay";
+export { submitToRifRelay } from "./rif-relay";
 
 // Constants
 export {
@@ -19,6 +20,8 @@ export {
     DEFAULT_TOKEN_AMOUNT,
     REFUEL_SWAP_ABI,
     ERC20_ABI,
+    RIF_RELAY_TESTNET_ADDRESSES,
+    RIF_RELAY_MAINNET_ADDRESSES,
 } from "./constants";
 
 // Types

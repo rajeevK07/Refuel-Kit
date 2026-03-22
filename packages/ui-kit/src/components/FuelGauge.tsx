@@ -9,11 +9,14 @@ export interface FuelGaugeProps {
     balance: bigint;
     /** Maximum balance for "full" gauge (default: 0.01 RBTC) */
     maxBalance?: bigint;
+    /** Threshold for "critical" level */
+    threshold?: number;
 }
 
 export const FuelGauge: React.FC<FuelGaugeProps> = ({
     balance,
     maxBalance = 10_000_000_000_000_000n, // 0.01 RBTC
+    threshold = 0.0001,
 }) => {
     const percentage = maxBalance === 0n
         ? 0
@@ -23,9 +26,26 @@ export const FuelGauge: React.FC<FuelGaugeProps> = ({
         percentage < 5 ? "critical" : percentage < 25 ? "low" : "ok";
 
     const formatBalance = (wei: bigint): string => {
-        const ethValue = Number(wei) / 1e18;
-        if (ethValue < 0.0001) return "<0.0001";
-        return ethValue.toFixed(4);
+        if (wei === 0n) return "0";
+
+        const divisor = 1_000_000_000_000_000_000n; // 1e18
+        const whole = wei / divisor;
+        const remainder = wei % divisor;
+
+        if (whole === 0n && remainder === 0n) return "0";
+
+        const fracStr = remainder
+            .toString()
+            .padStart(18, "0")
+            .replace(/0+$/, "");
+
+        if (!fracStr) return whole.toString();
+
+        const trimmed = fracStr.slice(0, 4);
+        const asNumber = Number(`0.${trimmed}`);
+        if (whole === 0n && asNumber < 0.0001) return "<0.0001";
+
+        return `${whole.toString()}.${trimmed}`;
     };
 
     return (

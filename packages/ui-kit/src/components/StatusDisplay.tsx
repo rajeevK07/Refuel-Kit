@@ -69,7 +69,17 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
                 <div className="refuel-success-icon">⛽</div>
                 <div className="refuel-success-title">Gas Tank Filled!</div>
                 <div className="refuel-success-amount">
-                    +{Number(state.result.rbtcReceived) / 1e18} RBTC received
+                    {(() => {
+                        const wei = state.result.rbtcReceived;
+                        const divisor = 1_000_000_000_000_000_000n;
+                        const whole = wei / divisor;
+                        const remainder = wei % divisor;
+                        const fracStr = remainder
+                            .toString()
+                            .padStart(18, "0")
+                            .slice(0, 4);
+                        return `+${whole.toString()}.${fracStr} RBTC received`;
+                    })()}
                 </div>
                 {blockExplorerUrl && (
                     <a

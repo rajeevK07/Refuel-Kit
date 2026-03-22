@@ -35,6 +35,12 @@ interface IRefuelSwap {
     /// @notice Emitted when the owner withdraws RBTC.
     event RbtcWithdrawn(uint256 amount);
 
+    /// @notice Emitted when a relayer is added or removed.
+    event RelayerConfigured(address indexed relayer, bool status);
+
+    /// @notice Emitted when a user withdraws pending RBTC.
+    event PendingRbtcWithdrawn(address indexed user, uint256 amount);
+
     // ──────────────────────────────────────────────
     //  Errors
     // ──────────────────────────────────────────────
@@ -45,6 +51,8 @@ interface IRefuelSwap {
     error InvalidAmount();
     error TransferFailed();
     error ZeroAddress();
+    error Unauthorized();
+    error RateLimitExceeded();
 
     // ──────────────────────────────────────────────
     //  Core Functions

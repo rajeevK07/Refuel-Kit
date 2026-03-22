@@ -21,6 +21,8 @@ export interface TokenConfig {
     permitSupport: PermitSupport;
     /** Token amount required per refuel swap */
     refuelAmount: bigint;
+    /** EIP-712 domain version (e.g. "1" or "2") */
+    domainVersion?: string;
 }
 
 /** Chain-specific configuration */
@@ -44,6 +46,38 @@ export interface RefuelConfig {
     contractAddress?: Address;
     /** Custom RPC URL */
     rpcUrl?: string;
+    /**
+     * Optional RIF Relay configuration.
+     *
+     * When provided, the SDK can envelop the RefuelSwap call via `@rsksmart/rif-relay-sdk`
+     * and submit it to a RIF Relay Server, instead of using the kit's lightweight `/api/refuel` relayer.
+     */
+    rifRelay?: RifRelayConfig;
+}
+
+/**
+ * Minimal configuration required to use RIF Relay's Enveloping flow.
+ * Addresses are expected to be deployed for the selected network.
+ */
+export interface RifRelayConfig {
+    /** Array of relay server URLs (e.g. ["https://relay.testnet.rootstock.io"]) */
+    preferredRelays: string[];
+    relayHubAddress: Address;
+    deployVerifierAddress: Address;
+    relayVerifierAddress: Address;
+    smartWalletFactoryAddress: Address;
+    /**
+     * Smart Wallet address that will forward the sponsored call.
+     * This must already exist / be deployed for `from`.
+     */
+    callForwarder: Address;
+    /**
+     * Token used to pay relaying fees (or the "gas token" configured on the relay stack).
+     * This is independent of the token being swapped by RefuelSwap.
+     */
+    feeToken: Address;
+    /** Max fee in `feeToken` wei (token decimals) */
+    maxFeeTokenAmount: bigint;
 }
 
 /** User's balance status */
@@ -101,6 +135,8 @@ export interface RefuelRequest {
     method: "permit" | "allowance";
     /** Signed permit data (only for method=permit) */
     permit?: SignedPermit;
+    /** Signature for the relay request itself (M1) */
+    signature?: Hex;
 }
 
 /** Result of a refuel operation */

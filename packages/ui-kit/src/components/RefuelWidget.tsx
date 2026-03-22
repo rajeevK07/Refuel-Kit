@@ -2,7 +2,7 @@
 // RefuelWidget — Drop-in rescue component
 // ─────────────────────────────────────────────────────
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import type { Address, WalletClient } from "viem";
 import type { Hash } from "viem";
 import type {
@@ -19,6 +19,7 @@ import { TokenSelector } from "./TokenSelector";
 import { StatusDisplay } from "./StatusDisplay";
 import { useRefuel } from "../hooks/useRefuel";
 import { useBalanceMonitor } from "../hooks/useBalanceMonitor";
+import { ErrorBoundary } from "./ErrorBoundary";
 import "../styles/refuel.css";
 
 export interface RefuelWidgetProps {
@@ -46,7 +47,15 @@ export interface RefuelWidgetProps {
     autoExpand?: boolean;
 }
 
-export const RefuelWidget: React.FC<RefuelWidgetProps> = ({
+export const RefuelWidget: React.FC<RefuelWidgetProps> = (props) => {
+    return (
+        <ErrorBoundary>
+            <RefuelWidgetContent {...props} />
+        </ErrorBoundary>
+    );
+};
+
+const RefuelWidgetContent: React.FC<RefuelWidgetProps> = ({
     address,
     walletClient,
     threshold = 0.0001,
@@ -63,16 +72,18 @@ export const RefuelWidget: React.FC<RefuelWidgetProps> = ({
     const [selectedToken, setSelectedToken] = useState<TokenSymbol | null>(null);
     const [dismissed, setDismissed] = useState(false);
 
-    const config: RefuelConfig = {
+    const config: RefuelConfig = useMemo(() => ({
         chainId,
         relayerUrl,
         contractAddress,
-    };
+    }), [chainId, relayerUrl, contractAddress]);
+
+    const memoizedAllowedTokens = useMemo(() => allowedTokens, [allowedTokens]);
 
     const chainConfig = CHAIN_CONFIGS[chainId];
 
     // Monitor balance
-    const { status: balanceStatus, isLoading: isCheckingBalance } =
+    const { status: balanceStatus } =
         useBalanceMonitor({
             address,
             config,
@@ -89,7 +100,7 @@ export const RefuelWidget: React.FC<RefuelWidgetProps> = ({
         }
     }, [autoExpand, balanceStatus?.needsRefuel, dismissed]);
 
-    // Handle success callback
+    // Handle success/error callbacks — explicitly list onSuccess/onError in deps (M6)
     useEffect(() => {
         if (refuelState.step === "success" && onSuccess) {
             onSuccess(refuelState.result.txHash);
@@ -97,19 +108,20 @@ export const RefuelWidget: React.FC<RefuelWidgetProps> = ({
         if (refuelState.step === "error" && onError) {
             onError(refuelState.error);
         }
-    }, [refuelState.step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refuelState.step, onSuccess, onError]);
 
     // Auto-select first available token
     useEffect(() => {
         if (!selectedToken && balanceStatus) {
             const available = balanceStatus.tokenBalances.find(
-                (tb) => tb.canRefuel && allowedTokens.includes(tb.token.symbol)
+                (tb) => tb.canRefuel && memoizedAllowedTokens.includes(tb.token.symbol)
             );
             if (available) {
                 setSelectedToken(available.token.symbol);
             }
         }
-    }, [balanceStatus, selectedToken, allowedTokens]);
+    }, [balanceStatus, selectedToken, memoizedAllowedTokens]);
 
     const handleRefuel = useCallback(async () => {
         if (!selectedToken || !walletClient) return;
@@ -196,7 +208,7 @@ export const RefuelWidget: React.FC<RefuelWidgetProps> = ({
 
                 {/* Fuel Gauge */}
                 {balanceStatus && (
-                    <FuelGauge balance={balanceStatus.rbtcBalance} />
+                    <FuelGauge balance={balanceStatus.rbtcBalance} threshold={threshold} />
                 )}
 
                 {/* Active Flow: Status Display */}
