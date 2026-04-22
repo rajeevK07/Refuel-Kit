@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         if (!signature) {
             return NextResponse.json(
                 { success: false, error: "Missing relay request signature" },
-                { status: 401 }
+                { status: 400 }
             );
         }
 
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
                 name: "RefuelRelayer",
                 version: "1",
                 chainId,
+                verifyingContract: config.refuelSwapAddress,
             },
             types: {
                 RefuelRelayRequest: [
@@ -83,7 +84,16 @@ export async function POST(req: Request) {
         const pk = rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`;
         const account = privateKeyToAccount(pk as `0x${string}`);
 
-        console.log(`[Relayer] Account: ${account.address} | Chain: ${chainId} | Method: ${method}`);
+        // KEY ROTATION PROCEDURE:
+        // 1. Generate a new private key and derive its address.
+        // 2. Call `setRelayer(newAddress, true)` on the RefuelSwap contract from the owner account.
+        // 3. Update the RELAYER_PRIVATE_KEY environment variable in the production deployment.
+        // 4. Restart the service to load the new key.
+        // 5. Call `setRelayer(oldAddress, false)` from the owner account to revoke the old key.
+
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[Relayer] Account: ${account.address} | Chain: ${chainId} | Method: ${method}`);
+        }
 
         const publicClient = createPublicClient({ chain, transport: http() });
         const walletClient = createWalletClient({ account, chain, transport: http() });
@@ -92,7 +102,7 @@ export async function POST(req: Request) {
 
         if (method === "permit" && permit) {
             // EIP-2612 path: user signed a permit, relayer submits + swaps in one tx
-            console.log("[Relayer] Executing refuelWithPermitFor");
+            if (process.env.NODE_ENV !== 'production') console.log("[Relayer] Executing refuelWithPermitFor");
             txHash = await walletClient.writeContract({
                 address: config.refuelSwapAddress,
                 abi: REFUEL_SWAP_ABI,
@@ -109,7 +119,7 @@ export async function POST(req: Request) {
             });
         } else {
             // Legacy-approve path: user approved the contract beforehand
-            console.log("[Relayer] Executing refuelWithAllowanceFor");
+            if (process.env.NODE_ENV !== 'production') console.log("[Relayer] Executing refuelWithAllowanceFor");
 
             // Check allowance first
             const currentAllowance = await publicClient.readContract({
@@ -140,7 +150,7 @@ export async function POST(req: Request) {
             });
         }
 
-        console.log(`[Relayer] TX submitted: ${txHash}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`[Relayer] TX submitted: ${txHash}`);
         return NextResponse.json({ success: true, txHash });
     } catch (e: any) {
         const msg = e.shortMessage || e.details || e.message || "Unknown error";

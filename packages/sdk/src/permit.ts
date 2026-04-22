@@ -119,12 +119,16 @@ export async function getPermitNonce(
     tokenAddress: Address,
     owner: Address
 ): Promise<bigint> {
-    return publicClient.readContract({
+    const nonce = await publicClient.readContract({
         address: tokenAddress,
         abi: ERC20_ABI,
         functionName: "nonces",
         args: [owner],
-    }) as Promise<bigint>;
+    });
+    if (typeof nonce !== "bigint" && typeof nonce !== "number" && typeof nonce !== "string") {
+        throw new Error("Invalid nonce returned from token contract");
+    }
+    return BigInt(nonce);
 }
 
 /**

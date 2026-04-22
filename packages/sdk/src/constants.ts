@@ -7,11 +7,11 @@ import type { ChainConfig, TokenConfig, RootstockChainId } from "./types";
 
 // ─── RBTC Threshold ──────────────────────────────────
 
-/** Balance threshold below which a user "needs refuel" (0.0001 RBTC) */
-export const REFUEL_THRESHOLD = 100_000_000_000_000n; // 0.0001 ether in wei
+/** Balance threshold below which a user "needs refuel" */
+export const REFUEL_THRESHOLD = 5_000_000_000_000n; // 0.000005 ether in wei
 
-/** Default RBTC amount returned per refuel (0.001 RBTC) */
-export const RBTC_PER_REFUEL = 1_000_000_000_000_000n; // 0.001 ether in wei
+/** Default RBTC amount returned per refuel */
+export const RBTC_PER_REFUEL = 10_000_000_000_000n; // 0.00001 ether in wei
 
 /** Default token amount required per refuel (5 tokens, 18 decimals)
  *  Based on contract rate: 5 tokens = 0.001 RBTC
@@ -43,7 +43,7 @@ const RIF_TESTNET: TokenConfig = {
     address: "0x19f64674d8a5b4e652319f5e239efd3bc969a1fe" as Address,
     decimals: 18,
     permitSupport: "legacy-approve",
-    refuelAmount: 5_000_000_000_000_000_000n, // 5 RIF → 0.001 RBTC at deployed rate
+    refuelAmount: 5_000_000_000_000_000_000n, // 5 RIF
 };
 
 const USDC_TESTNET: TokenConfig = {
@@ -52,7 +52,7 @@ const USDC_TESTNET: TokenConfig = {
     decimals: 18, // Rootstock Testnet mock USDC uses 18 decimals
     permitSupport: "eip2612", // Now points to our custom MockPermitToken
     domainVersion: "1",
-    refuelAmount: 5_000_000_000_000_000_000n, // 5 USDC equiv → 0.001 RBTC at deployed rate
+    refuelAmount: 5_000_000_000_000_000_000n, // 5 USDC
 };
 
 // ─── Chain Configs ───────────────────────────────────
@@ -63,7 +63,6 @@ export const CHAIN_CONFIGS: Record<RootstockChainId, ChainConfig> = {
         name: "Rootstock Mainnet",
         rpcUrl: "https://public-node.rsk.co",
         blockExplorerUrl: "https://rootstock.blockscout.com",
-        refuelSwapAddress: "0x1111111111111111111111111111111111111111" as Address, // Placeholder until mainnet deployment
         tokens: {
             RIF: RIF_MAINNET,
             USDC: USDC_MAINNET,
@@ -75,7 +74,7 @@ export const CHAIN_CONFIGS: Record<RootstockChainId, ChainConfig> = {
         name: "Rootstock Testnet",
         rpcUrl: "https://public-node.testnet.rsk.co",
         blockExplorerUrl: "https://rootstock-testnet.blockscout.com",
-        refuelSwapAddress: "0xecb2f47fd664f0376562f2a3b3748b2b4c6f40a7" as Address,
+        refuelSwapAddress: "0x97968888a592366b4806c53e195f160a34be0ace" as Address,
         tokens: {
             RIF: RIF_TESTNET,
             USDC: USDC_TESTNET,

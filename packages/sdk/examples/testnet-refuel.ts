@@ -24,8 +24,7 @@ import { RefuelClient, CHAIN_CONFIGS } from "../src";
 import type { RifRelayConfig } from "../src/types";
 
 // Configuration
-// const PRIVATE_KEY = "0x9473d60b260e191a7ccc942e6818bbfa600a5bec20f3fef1df88bca80a876a4c";
-const PRIVATE_KEY = "0x00ffb46dbe3c045f932e91995b5536b9dfb57d0c2857f7e8db3c2390399c3f7f";
+const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
 if (!PRIVATE_KEY) {
     console.error("Error: Please set PRIVATE_KEY environment variable.");
     process.exit(1);
@@ -75,7 +74,7 @@ async function loadRifRelayConfig(): Promise<RifRelayConfig | undefined> {
     // RIF Relay Server exposes /getaddr (see docs).
     let relayHubFromServer: Address | undefined;
     try {
-        const res = await fetch(`${relayUrl.replace(/\\/$/, "")}/getaddr`);
+        const res = await fetch(`${relayUrl.replace(/\\/$ /, "")}/getaddr`);
         if (res.ok) {
             const json: any = await res.json();
             if (json?.relayHubAddress) relayHubFromServer = json.relayHubAddress as Address;
@@ -87,7 +86,7 @@ async function loadRifRelayConfig(): Promise<RifRelayConfig | undefined> {
     // Helpful: pull verifier list from the server if possible.
     let verifiersFromServer: Address[] | undefined;
     try {
-        const res = await fetch(`${relayUrl.replace(/\\/$/, "")}/verifiers`);
+        const res = await fetch(`${relayUrl.replace(/\\/$ /, "")}/verifiers`);
         if (res.ok) {
             const json: any = await res.json();
             if (Array.isArray(json?.trustedVerifiers)) {

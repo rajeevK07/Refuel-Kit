@@ -33,7 +33,7 @@ export function useRefuel(options: UseRefuelOptions): UseRefuelReturn {
     const [result, setResult] = useState<RefuelResult | null>(null);
     const client = React.useMemo(
         () => new RefuelClient(config),
-        [config.chainId, config.contractAddress, config.relayerUrl, config.rpcUrl]
+        [config.chainId, config.contractAddress, config.relayerUrl, config.rpcUrl, JSON.stringify(config.rifRelay)]
     );
 
     const refuel = useCallback(

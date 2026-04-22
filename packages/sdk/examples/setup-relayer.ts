@@ -18,11 +18,13 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { rootstockTestnet } from "viem/chains";
-import { CHAIN_CONFIGS } from "../src";
+import { CHAIN_CONFIGS } from "../dist/index.js";
 
-const OWNER_PRIVATE_KEY = (process.env.PRIVATE_KEY ||
-    // The testnet deployer key (from testnet-refuel.ts example)
-    "0x00ffb46dbe3c045f932e91995b5536b9dfb57d0c2857f7e8db3c2390399c3f7f") as `0x${string}`;
+const OWNER_PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
+if (!OWNER_PRIVATE_KEY) {
+    console.error("Error: Please set PRIVATE_KEY environment variable.");
+    process.exit(1);
+}
 
 // The RELAYER wallet address used in the Next.js API route (api/refuel/route.ts)
 // This is the address derived from the key used in the backend relayer
@@ -94,24 +96,24 @@ async function main() {
 
     const [liquidity, rifSupported, usdcSupported, isRelayerNow] = await Promise.all([
         publicClient.readContract({
-            address: config.refuelSwapAddress,
+            address: config.refuelSwapAddress!,
             abi: REFUEL_SWAP_ADMIN_ABI,
             functionName: "availableLiquidity",
         }),
         publicClient.readContract({
-            address: config.refuelSwapAddress,
+            address: config.refuelSwapAddress!,
             abi: REFUEL_SWAP_ADMIN_ABI,
             functionName: "isTokenSupported",
             args: [config.tokens.RIF.address],
         }),
         publicClient.readContract({
-            address: config.refuelSwapAddress,
+            address: config.refuelSwapAddress!,
             abi: REFUEL_SWAP_ADMIN_ABI,
             functionName: "isTokenSupported",
             args: [config.tokens.USDC.address],
         }),
         publicClient.readContract({
-            address: config.refuelSwapAddress,
+            address: config.refuelSwapAddress!,
             abi: REFUEL_SWAP_ADMIN_ABI,
             functionName: "isRelayer",
             args: [RELAYER_ADDRESS_TO_WHITELIST],
@@ -129,7 +131,7 @@ async function main() {
         console.log("\n─── Whitelisting Relayer ─────────────────");
         const { request } = await publicClient.simulateContract({
             account: owner,
-            address: config.refuelSwapAddress,
+            address: config.refuelSwapAddress!,
             abi: REFUEL_SWAP_ADMIN_ABI,
             functionName: "setRelayer",
             args: [RELAYER_ADDRESS_TO_WHITELIST, true],
@@ -152,7 +154,7 @@ async function main() {
 
         if (depositAmount > 0n) {
             const hash = await walletClient.writeContract({
-                address: config.refuelSwapAddress,
+                address: config.refuelSwapAddress!,
                 abi: REFUEL_SWAP_ADMIN_ABI,
                 functionName: "depositLiquidity",
                 value: depositAmount,

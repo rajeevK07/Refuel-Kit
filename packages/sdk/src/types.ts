@@ -31,7 +31,7 @@ export interface ChainConfig {
     name: string;
     rpcUrl: string;
     blockExplorerUrl: string;
-    refuelSwapAddress: Address;
+    refuelSwapAddress?: Address;
     tokens: Record<TokenSymbol, TokenConfig>;
     /** RBTC amount returned per refuel swap */
     rbtcPerRefuel: bigint;

@@ -526,7 +526,30 @@ a:hover {
         flex-direction: column;
     }
 
+    .mobile-menu-toggle {
+        display: block;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-primary);
+    }
+
     .rescue-nav-links {
         display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        background: rgba(10, 10, 20, 0.95);
+        padding: 20px;
+        border-bottom: 1px solid var(--border-subtle);
     }
+
+    .rescue-nav-links.open {
+        display: flex;
+    }
+}
+
+.mobile-menu-toggle {
+    display: none;
 }

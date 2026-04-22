@@ -24,7 +24,7 @@ It allows a stranded user to swap a fixed amount of supported tokens (e.g., 5 US
 
 The RefuelSwap smart contract is live and fully verified on the Rootstock Testnet:
 
-**Contract Address:** [`0xecb2f47fd664f0376562f2a3b3748b2b4c6f40a7`](https://rootstock-testnet.blockscout.com/address/0xecb2f47fd664f0376562f2a3b3748b2b4c6f40a7)  
+**Contract Address:** [`0x97968888a592366b4806c53e195f160a34be0ace`](https://rootstock-testnet.blockscout.com/address/0x97968888a592366b4806c53e195f160a34be0ace)  
 **Supported Tokens:** `tUSDC` (EIP-2612 flow) and `tRIF` (Allowance flow)
 
 ---

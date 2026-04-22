@@ -57,6 +57,14 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
     /// @notice Tracks user's last refuel timestamp for rate limiting (L4)
     mapping(address => uint256) public lastRefuelTime;
 
+    /// @notice Maximum RBTC per swap
+    uint256 public constant MAX_REFUEL_AMOUNT = 0.01 ether;
+
+    /// @notice Daily spent amount per relayer
+    mapping(address => uint256) public relayerDailySpent;
+    mapping(address => uint256) public relayerLastSpendDay;
+    uint256 public constant DAILY_RELAYER_LIMIT = 0.1 ether;
+
     modifier onlyRelayer() {
         if (!isRelayer[msg.sender]) revert Unauthorized();
         _;
@@ -136,10 +144,17 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         bytes32 s
     ) internal {
         // Enforce rate limit (L4)
-        if (lastRefuelTime[owner] != 0 && block.timestamp < lastRefuelTime[owner] + 1 hours) {
+        if (
+            lastRefuelTime[owner] != 0 &&
+            block.timestamp < lastRefuelTime[owner] + 1 hours
+        ) {
             revert RateLimitExceeded();
         }
         lastRefuelTime[owner] = block.timestamp;
+
+        if (block.timestamp > deadline) {
+            revert PermitExpired();
+        }
 
         // 1. Validate
         (, uint256 rbtcOut) = _validateSwap(token, amount);
@@ -169,7 +184,10 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         uint256 amount
     ) external override nonReentrant {
         // Enforce rate limit (L4)
-        if (lastRefuelTime[msg.sender] != 0 && block.timestamp < lastRefuelTime[msg.sender] + 1 hours) {
+        if (
+            lastRefuelTime[msg.sender] != 0 &&
+            block.timestamp < lastRefuelTime[msg.sender] + 1 hours
+        ) {
             revert RateLimitExceeded();
         }
         lastRefuelTime[msg.sender] = block.timestamp;
@@ -190,9 +208,12 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         uint256 amount
     ) external nonReentrant onlyRelayer {
         if (owner == address(0)) revert ZeroAddress();
-        
+
         // Enforce rate limit (L4)
-        if (lastRefuelTime[owner] != 0 && block.timestamp < lastRefuelTime[owner] + 1 hours) {
+        if (
+            lastRefuelTime[owner] != 0 &&
+            block.timestamp < lastRefuelTime[owner] + 1 hours
+        ) {
             revert RateLimitExceeded();
         }
         lastRefuelTime[owner] = block.timestamp;
@@ -281,7 +302,7 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
      */
     function disableToken(address token) external onlyOwner {
         swapRates[token].enabled = false;
-        
+
         // Remove from supportedTokens array (M3)
         uint256 length = supportedTokens.length;
         for (uint256 i = 0; i < length; i++) {
@@ -369,6 +390,9 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         if (rbtcOut > address(this).balance) {
             revert InsufficientRbtcLiquidity(rbtcOut, address(this).balance);
         }
+        if (rbtcOut > MAX_REFUEL_AMOUNT) {
+            revert InvalidAmount();
+        }
     }
 
     function _executeSwap(
@@ -377,6 +401,18 @@ contract RefuelSwap is IRefuelSwap, Ownable, ReentrancyGuard {
         uint256 amount,
         uint256 rbtcOut
     ) internal {
+        if (msg.sender != owner && isRelayer[msg.sender]) {
+            uint256 currentDay = block.timestamp / 1 days;
+            if (relayerLastSpendDay[msg.sender] != currentDay) {
+                relayerLastSpendDay[msg.sender] = currentDay;
+                relayerDailySpent[msg.sender] = 0;
+            }
+            relayerDailySpent[msg.sender] += rbtcOut;
+            if (relayerDailySpent[msg.sender] > DAILY_RELAYER_LIMIT) {
+                revert RateLimitExceeded();
+            }
+        }
+
         // 1. Pull tokens from the user
         IERC20(token).safeTransferFrom(owner, address(this), amount);
 

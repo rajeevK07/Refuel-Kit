@@ -63,6 +63,10 @@ export async function submitToRifRelay(
     const chain = CHAIN_CONFIGS[chainId];
     if (!chain) throw new Error(`Unsupported chain ID for RIF Relay: ${chainId}`);
 
+    if (request.method === "permit" && !request.permit) {
+        throw new Error("Permit data required for permit method");
+    }
+
     const data =
         request.method === "permit"
             ? encodeFunctionData({
@@ -72,10 +76,10 @@ export async function submitToRifRelay(
                     request.owner,
                     request.token,
                     request.amount,
-                    BigInt(request.permit?.deadline ?? 0n),
-                    request.permit?.v ?? 0,
-                    (request.permit?.r ?? "0x0") as any,
-                    (request.permit?.s ?? "0x0") as any,
+                    BigInt(request.permit!.deadline),
+                    request.permit!.v,
+                    request.permit!.r,
+                    request.permit!.s,
                 ],
             })
             : encodeFunctionData({

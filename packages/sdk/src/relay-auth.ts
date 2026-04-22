@@ -22,7 +22,8 @@ import type { RefuelRequest } from "./types";
 export async function signRelayRequest(
     walletClient: WalletClient,
     request: RefuelRequest,
-    chainId: number
+    chainId: number,
+    verifyingContract: Address
 ): Promise<Hex> {
     const account = walletClient.account;
     if (!account) throw new Error("Wallet client must have an account");
@@ -31,6 +32,7 @@ export async function signRelayRequest(
         name: "RefuelRelayer",
         version: "1",
         chainId: BigInt(chainId),
+        verifyingContract,
     } as const;
 
     const types = {

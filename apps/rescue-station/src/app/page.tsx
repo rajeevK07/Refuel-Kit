@@ -9,8 +9,14 @@ import {
     type BalanceStatus,
 } from "@rootstock-kits/refuel-sdk";
 import { RefuelWidget } from "@rootstock-kits/refuel-ui";
-import { createWalletClient, custom, type Address, type WalletClient } from "viem";
+import { createWalletClient, custom, createPublicClient, type Address, type WalletClient } from "viem";
 import { rootstock, rootstockTestnet } from "viem/chains";
+
+declare global {
+    interface Window {
+        ethereum?: any;
+    }
+}
 
 export default function RescueStationPage() {
     const [currentChainId, setCurrentChainId] = useState<30 | 31>(31);
@@ -23,6 +29,7 @@ export default function RescueStationPage() {
     // Approval state for non-permit tokens (e.g. RIF)
     const [needsApproval, setNeedsApproval] = useState<{ spenderAddress: Address; tokenAddress: Address; requiredAmount: bigint } | null>(null);
     const [isApproving, setIsApproving] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     // Dynamic refuel client based on connected chain
     const refuelClient = React.useMemo(() => new RefuelClient({
@@ -188,13 +195,13 @@ export default function RescueStationPage() {
                 functionName: "approve",
                 args: [needsApproval.spenderAddress, needsApproval.requiredAmount],
             } as any);
-            // Wait briefly then clear approval state so widget can retry
-            setTimeout(() => {
-                setNeedsApproval(null);
-                setIsApproving(false);
-            }, 3000);
+            const chain = currentChainId === 30 ? rootstock : rootstockTestnet;
+            const publicClient = createPublicClient({ chain, transport: custom(window.ethereum) });
+            await publicClient.waitForTransactionReceipt({ hash: txHash });
+            setNeedsApproval(null);
+            setIsApproving(false);
         } catch (err) {
-            console.error("Approval failed:", err);
+            if (process.env.NODE_ENV !== 'production') console.error("Approval failed:", err);
             setIsApproving(false);
         }
     }, [walletClient, needsApproval]);
@@ -214,8 +221,9 @@ export default function RescueStationPage() {
                     <div className="rescue-logo-icon">⛽</div>
                     <span>Rescue Station</span>
                 </div>
-                <div className="rescue-nav-links">
-                    <a href="#how-it-works" className="rescue-nav-link">
+                <div className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>☰</div>
+                <div className={`rescue-nav-links ${mobileMenuOpen ? 'open' : ''}`}>
+                    <a href="#how-it-works" className="rescue-nav-link" onClick={() => setMobileMenuOpen(false)}>
                         How It Works
                     </a>
                     <a href="#technology" className="rescue-nav-link">
@@ -412,7 +420,7 @@ export default function RescueStationPage() {
                                         allowedTokens={["USDC", "RIF"]}
                                         autoExpand={true}
                                         onSuccess={(txHash) => {
-                                            console.log("Refueled! TX:", txHash);
+                                            if (process.env.NODE_ENV !== 'production') console.log("Refueled! TX:", txHash);
                                             setNeedsApproval(null);
                                         }}
                                         onError={(err) => {
@@ -450,7 +458,7 @@ export default function RescueStationPage() {
                         <h3>Detect</h3>
                         <p>
                             The widget monitors your RBTC balance. When it drops below
-                            0.0001 RBTC, it triggers Rescue Mode.
+                            0.000005 RBTC, it triggers Rescue Mode.
                         </p>
                     </div>
 
@@ -479,7 +487,7 @@ export default function RescueStationPage() {
                         <div className="rescue-flow-step-icon">⛽</div>
                         <h3>Refuel</h3>
                         <p>
-                            The smart contract swaps 5 tokens for 0.001 RBTC and sends it
+                            The smart contract swaps 5 tokens for 0.00001 RBTC and sends it
                             directly to your wallet. You&apos;re free!
                         </p>
                     </div>

@@ -53,6 +53,7 @@ interface IRefuelSwap {
     error ZeroAddress();
     error Unauthorized();
     error RateLimitExceeded();
+    error PermitExpired();
 
     // ──────────────────────────────────────────────
     //  Core Functions
@@ -82,10 +83,7 @@ interface IRefuelSwap {
      * @param token  The ERC20 token address to swap from.
      * @param amount The amount of tokens to swap.
      */
-    function refuelWithAllowance(
-        address token,
-        uint256 amount
-    ) external;
+    function refuelWithAllowance(address token, uint256 amount) external;
 
     // ──────────────────────────────────────────────
     //  View Functions

@@ -108,7 +108,7 @@ const RefuelWidgetContent: React.FC<RefuelWidgetProps> = ({
         if (refuelState.step === "error" && onError) {
             onError(refuelState.error);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refuelState.step, onSuccess, onError]);
 
     // Auto-select first available token
@@ -167,7 +167,7 @@ const RefuelWidgetContent: React.FC<RefuelWidgetProps> = ({
                     onClick={() => setIsExpanded(true)}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && setIsExpanded(true)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setIsExpanded(true)}
                 >
                     <span className="refuel-banner-icon">⛽</span>
                     <div className="refuel-banner-text">

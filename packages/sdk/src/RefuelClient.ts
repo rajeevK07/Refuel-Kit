@@ -58,8 +58,8 @@ export class RefuelClient {
     private publicClient: PublicClient;
     private chainConfig: ChainConfig;
     private relayerUrl: string;
-    private contractAddress: Address;
     private rifRelayConfig?: RefuelConfig["rifRelay"];
+    private contractAddress?: Address;
 
     constructor(config: RefuelConfig) {
         const chainConfig = CHAIN_CONFIGS[config.chainId];
@@ -70,12 +70,7 @@ export class RefuelClient {
         }
 
         this.chainConfig = chainConfig;
-        this.contractAddress =
-            config.contractAddress ?? chainConfig.refuelSwapAddress;
-        
-        if (this.contractAddress === "0x0000000000000000000000000000000000000000") {
-            throw new Error(`RefuelSwap contract is not yet deployed on chain ${config.chainId}. Provide a valid custom contractAddress.`);
-        }
+        this.contractAddress = config.contractAddress ?? chainConfig.refuelSwapAddress;
         this.relayerUrl = config.relayerUrl ?? "";
         this.rifRelayConfig = config.rifRelay;
 
@@ -90,6 +85,18 @@ export class RefuelClient {
             transport: http(config.rpcUrl ?? chainConfig.rpcUrl),
             batch: { multicall: true },
         });
+    }
+
+    private ensureContractAddress(): Address {
+        if (
+            !this.contractAddress ||
+            this.contractAddress === "0x0000000000000000000000000000000000000000"
+        ) {
+            throw new Error(
+                `RefuelSwap contract is not yet deployed on chain ${this.chainConfig.chainId}. Provide a valid custom contractAddress.`
+            );
+        }
+        return this.contractAddress;
     }
 
     // ─── Balance Check ──────────────────────────────
@@ -194,11 +201,12 @@ export class RefuelClient {
         if (request.method === "permit") {
             onStateChange?.("awaiting-signature");
 
+            const contractAddress = this.ensureContractAddress();
             const signedPermit = await signPermit(
                 walletClient,
                 this.publicClient,
                 tokenConfig.address,
-                this.contractAddress,
+                contractAddress,
                 request.amount,
                 {
                     deadline: params.deadline,
@@ -211,10 +219,12 @@ export class RefuelClient {
 
         // 3. Sign the relay request itself (M1)
         onStateChange?.("awaiting-signature");
+        const contractAddress = this.ensureContractAddress();
         request.signature = await signRelayRequest(
             walletClient,
             request,
-            this.chainConfig.chainId
+            this.chainConfig.chainId,
+            contractAddress
         );
 
         // 4. Submit to relay
@@ -222,10 +232,11 @@ export class RefuelClient {
 
         // Preferred: RIF Relay (if configured)
         if (this.rifRelayConfig) {
+            const contractAddress = this.ensureContractAddress();
             const txHash = await submitToRifRelay(
                 this.rifRelayConfig,
                 this.chainConfig.chainId,
-                this.contractAddress,
+                contractAddress,
                 request
             );
             onStateChange?.("confirming", { txHash });
@@ -270,8 +281,9 @@ export class RefuelClient {
 
     /** Get the quote for a refuel swap */
     async getQuote(token: Address, amount: bigint): Promise<bigint> {
+        const contractAddress = this.ensureContractAddress();
         return (await this.publicClient.readContract({
-            address: this.contractAddress,
+            address: contractAddress,
             abi: REFUEL_SWAP_ABI,
             functionName: "getQuote",
             args: [token, amount],
@@ -280,8 +292,9 @@ export class RefuelClient {
 
     /** Get the available RBTC liquidity in the contract */
     async getAvailableLiquidity(): Promise<bigint> {
+        const contractAddress = this.ensureContractAddress();
         return (await this.publicClient.readContract({
-            address: this.contractAddress,
+            address: contractAddress,
             abi: REFUEL_SWAP_ABI,
             functionName: "availableLiquidity",
         })) as bigint;
